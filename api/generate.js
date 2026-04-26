@@ -46,26 +46,131 @@ export default async function handler(req, res) {
       });
     }
 
-    const MODEL_ENDPOINTS = {
-      "kling-3-motion-control-std": {
-        name: "Kling 3 Motion Control Standard",
+    if (!modelId) {
+      return res.status(400).json({
+        success: false,
+        error: "Model AI wajib dipilih."
+      });
+    }
+
+    function fallbackMotion(displayName) {
+      return {
+        name: displayName,
+        mode: "motion-control-fallback",
         endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
         maxDuration: 30
-      },
+      };
+    }
+
+    const MODEL_ROUTES = {
+      // KLING - motion transfer utama
       "kling-3-1-motion-control": {
         name: "Kling 3.1 Motion Control",
+        mode: "motion-control",
         endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
         maxDuration: 30
       },
+
+      "kling-3-motion-control-std": {
+        name: "Kling 3 Motion Control Standard",
+        mode: "motion-control",
+        endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
+        maxDuration: 30
+      },
+
+      "kling-2-6-motion-control": {
+        name: "Kling 2.6 Motion Control",
+        mode: "motion-control",
+        endpoint: "https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std",
+        maxDuration: 30
+      },
+
       "kling-3-1-omni": {
         name: "Kling 3.1 Omni",
+        mode: "reference-to-video",
         endpoint: "https://api.freepik.com/v1/ai/reference-to-video/kling-v3-omni-std",
         maxDuration: 15
-      }
+      },
+
+      "kling-3-0": {
+        name: "Kling 3.0",
+        mode: "motion-control-fallback",
+        endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
+        maxDuration: 30
+      },
+
+      "kling-2-6": fallbackMotion("Kling 2.6"),
+      "kling-o1": fallbackMotion("Kling O1"),
+      "kling-2-5": fallbackMotion("Kling 2.5"),
+      "kling-2-1": fallbackMotion("Kling 2.1"),
+      "kling-2-1-master": fallbackMotion("Kling 2.1 Master"),
+
+      // SEEDANCE - aktif di UI, fallback ke Kling Motion Control
+      "seedance-2-0": fallbackMotion("Seedance 2.0"),
+      "seedance-2-0-fast": fallbackMotion("Seedance 2.0 Fast"),
+      "seedance-1-5-pro": fallbackMotion("Seedance 1.5 Pro"),
+      "seedance-1-0-pro": fallbackMotion("Seedance 1.0 Pro"),
+      "seedance-1-0-fast": fallbackMotion("Seedance 1.0 Fast"),
+      "seedance-1-0-lite": fallbackMotion("Seedance 1.0 Lite"),
+
+      // GROK
+      "grok": fallbackMotion("Grok"),
+
+      // GOOGLE VEO
+      "veo-3-1": fallbackMotion("Google Veo 3.1"),
+      "veo-3-1-fast": fallbackMotion("Google Veo 3.1 Fast"),
+      "veo-3-1-lite": fallbackMotion("Google Veo 3.1 Lite"),
+      "veo-3": fallbackMotion("Google Veo 3"),
+      "veo-3-fast": fallbackMotion("Google Veo 3 Fast"),
+      "veo-2": fallbackMotion("Google Veo 2"),
+
+      // OMNI HUMAN
+      "omni-human-1-5": fallbackMotion("Omni Human 1.5"),
+
+      // RUNWAY
+      "runway-gen-4-5": fallbackMotion("Runway Gen 4.5"),
+      "runway-gen-4": fallbackMotion("Runway Gen 4"),
+      "runway-act-two": fallbackMotion("Runway Act Two"),
+
+      // VEED FABRIC
+      "veed-fabric-1-0": fallbackMotion("Veed Fabric 1.0"),
+      "veed-fabric-1-0-fast": fallbackMotion("Veed Fabric 1.0 Fast"),
+
+      // HAILUO
+      "hailuo-2-3": fallbackMotion("MiniMax Hailuo 2.3"),
+      "hailuo-2-3-fast": fallbackMotion("MiniMax Hailuo 2.3 Fast"),
+      "hailuo-02": fallbackMotion("MiniMax Hailuo 02"),
+      "hailuo-live-illustrations": fallbackMotion("MiniMax Hailuo Live Illustrations"),
+
+      // PIXVERSE
+      "pixverse-6": fallbackMotion("PixVerse 6"),
+      "pixverse-5-5": fallbackMotion("PixVerse 5.5"),
+
+      // SORA
+      "sora-2-pro": fallbackMotion("Sora 2 Pro"),
+      "sora-2": fallbackMotion("Sora 2"),
+
+      // WAN
+      "wan-2-7": fallbackMotion("Wan 2.7"),
+      "wan-2-6": fallbackMotion("Wan 2.6"),
+      "wan-2-5": fallbackMotion("Wan 2.5"),
+      "wan-2-2": fallbackMotion("Wan 2.2"),
+      "wan-2-2-anime-move": fallbackMotion("Wan 2.2 Anime Move"),
+
+      // LTX
+      "ltx-2-pro": fallbackMotion("LTX 2 Pro"),
+      "ltx-2-fast": fallbackMotion("LTX 2 Fast")
     };
 
-    const selectedModel =
-      MODEL_ENDPOINTS[modelId] || MODEL_ENDPOINTS["kling-3-motion-control-std"];
+    const selectedModel = MODEL_ROUTES[modelId];
+
+    if (!selectedModel) {
+      return res.status(400).json({
+        success: false,
+        error: "Model AI tidak dikenali.",
+        receivedModelId: modelId
+      });
+    }
 
     const requestedDuration = Number(duration || 5);
 
@@ -76,39 +181,51 @@ export default async function handler(req, res) {
       });
     }
 
-    const finalPrompt = `
-Transfer the motion, body movement, dance rhythm, timing, gesture, and facial expression from the reference video to the uploaded character image.
-Keep the model identity, face structure, hair, skin tone, outfit, and body proportion consistent.
-Make the result realistic, cinematic, smooth, full-body, stable, natural, high quality, and social-media ready.
-Avoid distorted face, extra limbs, broken hands, body glitch, flicker, blur, watermark, text, and unnatural motion.
+    const qualityPrompt = `
+Create a realistic high quality AI video.
+The uploaded image is the main character/model.
+The reference video is the motion source.
+Transfer the body movement, dance rhythm, timing, gesture, pose, and expression from the reference video to the uploaded model image.
+Keep the face identity, skin tone, hair, outfit, body proportion, and character consistency from the uploaded image.
+Use realistic lighting, smooth motion, stable camera, natural body movement, full body framing, cinematic quality, clean details.
+Avoid distorted face, extra limbs, duplicate body, broken hands, bad anatomy, flicker, blur, watermark, text, logo, body glitch, and unnatural movement.
+
+Selected model label:
+${selectedModel.name}
 
 User optional prompt:
-${prompt || "Realistic full body dance video, smooth motion, stable camera, natural lighting."}
+${prompt || "Realistic full body dance video, smooth motion, stable camera, natural lighting, social-media ready."}
 `;
 
     let requestBody = {};
 
     if (
-      modelId === "kling-3-motion-control-std" ||
-      modelId === "kling-3-1-motion-control"
+      selectedModel.mode === "motion-control" ||
+      selectedModel.mode === "motion-control-fallback"
     ) {
       requestBody = {
         image_url: imageUrl,
         video_url: videoUrl,
-        prompt: finalPrompt,
+        prompt: qualityPrompt,
         character_orientation: "video",
         cfg_scale: 0.5
       };
-    } else {
+    }
+
+    if (selectedModel.mode === "reference-to-video") {
       requestBody = {
-        image_url: imageUrl,
         video_url: videoUrl,
-        prompt: finalPrompt,
-        duration: String(Math.min(requestedDuration, 15)),
+        image_url: imageUrl,
+        prompt: `
+Use @Video1 as the main motion reference.
+Create a new realistic video where the uploaded model image follows the movement from @Video1.
+${qualityPrompt}
+`,
+        duration: String(Math.min(requestedDuration, selectedModel.maxDuration)),
         aspect_ratio: aspectRatio || "9:16",
         cfg_scale: 0.5,
         negative_prompt:
-          "blur, low quality, distorted face, deformed body, extra limbs, duplicate person, broken hands, bad anatomy, flicker, watermark, text, logo, unnatural movement"
+          "blur, low quality, distorted face, deformed body, extra limbs, duplicate person, broken hands, bad anatomy, flicker, watermark, text, logo, unnatural movement, body glitch"
       };
     }
 
@@ -127,7 +244,9 @@ ${prompt || "Realistic full body dance video, smooth motion, stable camera, natu
       return res.status(freepikResponse.status).json({
         success: false,
         error: "Request ke Freepik gagal.",
-        model: selectedModel.name,
+        selectedModel: selectedModel.name,
+        mode: selectedModel.mode,
+        endpoint: selectedModel.endpoint,
         detail: data
       });
     }
@@ -135,7 +254,12 @@ ${prompt || "Realistic full body dance video, smooth motion, stable camera, natu
     return res.status(200).json({
       success: true,
       message: "Request video berhasil dikirim ke Freepik.",
-      model: selectedModel.name,
+      selectedModel: selectedModel.name,
+      mode: selectedModel.mode,
+      note:
+        selectedModel.mode === "motion-control-fallback"
+          ? "Model ini aktif di UI, tetapi backend menjalankan motion transfer melalui Kling Motion Control agar fitur video referensi tetap bekerja."
+          : "Model dijalankan sesuai route backend.",
       result: data
     });
   } catch (error) {
@@ -145,4 +269,4 @@ ${prompt || "Realistic full body dance video, smooth motion, stable camera, natu
       detail: error.message
     });
   }
-}
+    }
