@@ -32,15 +32,15 @@ export default async function handler(req, res) {
     }
 
     const STATUS_ROUTES = {
-      "kling-3-1-motion-control": "https://api.freepik.com/v1/ai/video/kling-v3/{taskId}",
-      "kling-3-motion-control-std": "https://api.freepik.com/v1/ai/video/kling-v3/{taskId}",
-      "kling-2-6-motion-control": "https://api.freepik.com/v1/ai/video/kling-v3/{taskId}",
-      "kling-3-1-omni": "https://api.freepik.com/v1/ai/video/kling-v3/{taskId}"
+      "kling-3-1-motion-control": "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std/{taskId}",
+      "kling-3-motion-control-std": "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std/{taskId}",
+      "kling-2-6-motion-control": "https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std/{taskId}",
+      "kling-3-1-omni": "https://api.freepik.com/v1/ai/reference-to-video/kling-v3-omni-std/{taskId}"
     };
 
     const template =
       STATUS_ROUTES[modelId] ||
-      "https://api.freepik.com/v1/ai/video/kling-v3/{taskId}";
+      "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std/{taskId}";
 
     const statusUrl = template.replace("{taskId}", taskId);
 
@@ -75,10 +75,25 @@ export default async function handler(req, res) {
       data?.result?.generated ||
       [];
 
+    const videoUrl =
+      data?.data?.generated?.[0]?.url ||
+      data?.data?.generated?.[0] ||
+      data?.generated?.[0]?.url ||
+      data?.generated?.[0] ||
+      data?.result?.data?.generated?.[0]?.url ||
+      data?.result?.data?.generated?.[0] ||
+      data?.result?.generated?.[0]?.url ||
+      data?.result?.generated?.[0] ||
+      data?.data?.video_url ||
+      data?.video_url ||
+      data?.url ||
+      null;
+
     return res.status(200).json({
       success: true,
       status,
       generated,
+      videoUrl,
       taskId,
       raw: data
     });
