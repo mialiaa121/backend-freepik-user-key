@@ -172,14 +172,39 @@ export default async function handler(req, res) {
       });
     }
 
-    const requestedDuration = Number(duration || 5);
+    const MODE_MAX_DURATION = {
+  cloning: 30,
+  timelapse: 90,
+  affiliate: 300
+};
 
-    if (requestedDuration > selectedModel.maxDuration) {
-      return res.status(400).json({
-        success: false,
-        error: `Durasi maksimal untuk ${selectedModel.name} adalah ${selectedModel.maxDuration} detik.`
-      });
-    }
+const MODE_DEFAULT_DURATION = {
+  cloning: 5,
+  timelapse: 15,
+  affiliate: 30
+};
+
+const requestedDuration = Number(
+  duration || MODE_DEFAULT_DURATION[selectedVideoMode] || 5
+);
+
+const modeMaxDuration = MODE_MAX_DURATION[selectedVideoMode] || 30;
+
+// Untuk keamanan API, tetap batasi sesuai model jika model punya batas lebih kecil.
+const allowedMaxDuration = Math.min(
+  modeMaxDuration,
+  selectedModel.maxDuration || modeMaxDuration
+);
+
+if (requestedDuration > allowedMaxDuration) {
+  return res.status(400).json({
+    success: false,
+    error: `Durasi maksimal untuk mode ${selectedVideoMode} dengan model ${selectedModel.name} adalah ${allowedMaxDuration} detik.`,
+    requestedDuration,
+    modeMaxDuration,
+    modelMaxDuration: selectedModel.maxDuration
+  });
+}
 
     const qualityPrompt = `
 Create a realistic high quality AI video.
