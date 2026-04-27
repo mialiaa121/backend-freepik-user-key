@@ -1,0 +1,10 @@
+{
+  "name": "backend-freepik-user-key",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node api/generate.js"
+  },
+  "dependencies": {}
+}
