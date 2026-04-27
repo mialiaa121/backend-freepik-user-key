@@ -31,17 +31,25 @@ function getTaskId(data) {
 }
 
 function getStatus(data) {
-  return (
-    data?.data?.status ||
-    data?.status ||
-    "UNKNOWN"
-  );
+  return data?.data?.status || data?.status || "UNKNOWN";
 }
 
 function isFailed(status) {
   return ["FAILED", "ERROR", "CANCELED", "CANCELLED"].includes(
     String(status || "").toUpperCase()
   );
+}
+
+async function urlToBase64(url) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Gagal mengambil gambar dari Supabase.");
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  return buffer.toString("base64");
 }
 
 async function pollFluxImage(freepikApiKey, taskId) {
@@ -127,6 +135,9 @@ export default async function handler(req, res) {
       });
     }
 
+    const modelBase64 = await urlToBase64(imageUrl);
+    const productBase64 = await urlToBase64(productImageUrl);
+
     const finalPrompt =
       prompt?.trim() ||
       `Buat gambar UGC affiliate realistis untuk TikTok/Reels.
@@ -151,8 +162,8 @@ Jangan ada teks tambahan, jangan ada watermark, jangan membuat produk baru, jang
           : "social_story_9_16",
       resolution: "1k",
       output_format: "jpeg",
-      input_image: imageUrl,
-      input_image_2: productImageUrl,
+      input_image: modelBase64,
+      input_image_2: productBase64,
       safety_tolerance: 2
     };
 
@@ -177,8 +188,7 @@ Jangan ada teks tambahan, jangan ada watermark, jangan membuat produk baru, jang
           data?.error ||
           data?.detail ||
           "Gagal compose affiliate image.",
-        raw: data,
-        sentPayload: payload
+        raw: data
       });
     }
 
@@ -214,4 +224,4 @@ Jangan ada teks tambahan, jangan ada watermark, jangan membuat produk baru, jang
       error: error?.message || "Terjadi error compose affiliate image."
     });
   }
-}
+    }
