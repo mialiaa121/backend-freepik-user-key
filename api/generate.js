@@ -1,7 +1,203 @@
-export default async function handler(req, res) {
+const FREEPIK_BASE_URL = "https://api.freepik.com";
+
+function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function cleanDuration(duration, fallback = 5) {
+  const number = Number(duration);
+  if (!Number.isFinite(number)) return fallback;
+  return number;
+}
+
+function normalizeAspectRatio(aspectRatio) {
+  if (!aspectRatio) return "9:16";
+  return aspectRatio;
+}
+
+function getVideoEndpoint({ videoMode, modelId, hasVideoReference }) {
+  if (videoMode === "affiliate" && modelId === "veed-fabric-1-0-fast") {
+    return {
+      type: "lip-sync",
+      createEndpoint: "/v1/ai/lip-sync/veed-fabric-1-0-fast",
+      statusEndpoint: "/v1/ai/lip-sync/veed-fabric-1-0-fast"
+    };
+  }
+
+  if (videoMode === "affiliate" && modelId === "veed-fabric-1-0") {
+    return {
+      type: "lip-sync",
+      createEndpoint: "/v1/ai/lip-sync/veed-fabric-1-0",
+      statusEndpoint: "/v1/ai/lip-sync/veed-fabric-1-0"
+    };
+  }
+
+  if (modelId === "kling-3-1-motion-control" || modelId === "kling-3-0-motion-control") {
+    return {
+      type: "motion-control",
+      createEndpoint: "/v1/ai/video/kling-v3-motion-control-pro",
+      statusEndpoint: "/v1/ai/video/kling-v3-motion-control-pro"
+    };
+  }
+
+  if (modelId === "kling-2-6-motion-control") {
+    return {
+      type: "motion-control",
+      createEndpoint: "/v1/ai/video/kling-v2-6-motion-control-pro",
+      statusEndpoint: "/v1/ai/image-to-video/kling-v2-6"
+    };
+  }
+
+  if (modelId === "kling-3-1-omni") {
+    if (hasVideoReference) {
+      return {
+        type: "reference-to-video",
+        createEndpoint: "/v1/ai/reference-to-video/kling-v3-omni-pro",
+        statusEndpoint: "/v1/ai/reference-to-video/kling-v3-omni"
+      };
+    }
+
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/kling-v3-omni-pro",
+      statusEndpoint: "/v1/ai/video/kling-v3-omni"
+    };
+  }
+
+  if (modelId === "kling-3-0") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/kling-v3-pro",
+      statusEndpoint: "/v1/ai/video/kling-v3"
+    };
+  }
+
+  if (modelId === "kling-2-6") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/image-to-video/kling-v2-6-pro",
+      statusEndpoint: "/v1/ai/image-to-video/kling-v2-6"
+    };
+  }
+
+  if (modelId === "seedance-1-5-pro") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/seedance-1-5-pro-480p",
+      statusEndpoint: "/v1/ai/video/seedance-1-5-pro-480p"
+    };
+  }
+
+  if (modelId === "seedance-1-0-pro") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/seedance-1-0-pro",
+      statusEndpoint: "/v1/ai/video/seedance-1-0-pro"
+    };
+  }
+
+  if (modelId === "seedance-1-0-fast") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/seedance-1-0-fast",
+      statusEndpoint: "/v1/ai/video/seedance-1-0-fast"
+    };
+  }
+
+  if (modelId === "seedance-1-0-lite") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/seedance-1-0-lite",
+      statusEndpoint: "/v1/ai/video/seedance-1-0-lite"
+    };
+  }
+
+  if (modelId === "wan-2-6") {
+    return {
+      type: "text-to-video",
+      createEndpoint: "/v1/ai/text-to-video/wan-v2-6-720p",
+      statusEndpoint: "/v1/ai/text-to-video/wan-v2-6-720p"
+    };
+  }
+
+  if (modelId === "wan-2-2") {
+    return {
+      type: "image-to-video",
+      createEndpoint: "/v1/ai/video/wan-v2-2",
+      statusEndpoint: "/v1/ai/video/wan-v2-2"
+    };
+  }
+
+  return {
+    type: hasVideoReference ? "motion-control" : "image-to-video",
+    createEndpoint: hasVideoReference
+      ? "/v1/ai/video/kling-v3-motion-control-pro"
+      : "/v1/ai/video/kling-v3-pro",
+    statusEndpoint: hasVideoReference
+      ? "/v1/ai/video/kling-v3-motion-control-pro"
+      : "/v1/ai/video/kling-v3"
+  };
+}
+
+function buildPrompt({
+  videoMode,
+  prompt,
+  productName,
+  productBenefits,
+  ctaText,
+  affiliateStyle
+}) {
+  if (prompt && prompt.trim()) return prompt.trim();
+
+  if (videoMode === "cloning") {
+    return "Transfer the motion from the reference video to the character image. Preserve the person's face, identity, outfit, body proportions, and realistic movement. Avoid extra phones, extra hands, duplicated objects, distorted fingers, blur, or changing the original character.";
+  }
+
+  if (videoMode === "timelapse") {
+    return "Create a realistic cinematic timelapse transformation video. Show the object gradually changing step by step with smooth progression, realistic lighting, detailed construction process, workers, tools, dust, materials, and professional camera movement.";
+  }
+
+  if (videoMode === "affiliate") {
+    return `Create a realistic affiliate UGC video in the style: ${affiliateStyle || "UGC Review Natural"}.
+Product: ${productName || "the product"}.
+Main benefits: ${productBenefits || "show the product benefits naturally"}.
+CTA: ${ctaText || "try it now"}.
+Make it natural, realistic, persuasive, social-media ready, with clear product focus, authentic expression, clean lighting, and premium UGC look.`;
+  }
+
+  return "Create a realistic high quality AI video.";
+}
+
+function getTaskId(data) {
+  return (
+    data?.data?.task_id ||
+    data?.task_id ||
+    data?.result?.task_id ||
+    data?.result?.data?.task_id ||
+    data?.id ||
+    data?.data?.id ||
+    null
+  );
+}
+
+function getDirectVideoUrl(data) {
+  return (
+    data?.data?.video_url ||
+    data?.data?.url ||
+    data?.data?.generated?.[0]?.url ||
+    data?.data?.generated?.[0] ||
+    data?.video_url ||
+    data?.url ||
+    data?.generated?.[0]?.url ||
+    data?.generated?.[0] ||
+    null
+  );
+}
+
+export default async function handler(req, res) {
+  setCors(res);
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -9,8 +205,7 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") {
     return res.status(405).json({
-      success: false,
-      error: "Gunakan method POST."
+      error: "Method not allowed. Gunakan POST."
     });
   }
 
@@ -19,279 +214,161 @@ export default async function handler(req, res) {
       freepikApiKey,
       videoUrl,
       imageUrl,
+      productImageUrl,
+      audioUrl,
       prompt,
+      productName,
+      productBenefits,
+      ctaText,
+      affiliateStyle,
+      videoMode,
       modelId,
       duration,
-      aspectRatio
-    } = req.body;
+      aspectRatio,
+      resolution
+    } = req.body || {};
 
     if (!freepikApiKey) {
       return res.status(400).json({
-        success: false,
-        error: "API key Freepik wajib diisi."
+        error: "Freepik API key kosong."
       });
     }
 
-    if (!videoUrl) {
+    if (!imageUrl && videoMode !== "timelapse") {
       return res.status(400).json({
-        success: false,
-        error: "Video referensi wajib diupload."
+        error: "Foto model / objek kosong."
       });
     }
 
-    if (!imageUrl) {
+    if (videoMode === "cloning" && !videoUrl) {
       return res.status(400).json({
-        success: false,
-        error: "Foto model wajib diupload."
+        error: "Video referensi wajib untuk mode cloning."
       });
     }
 
-    if (!modelId) {
+    if (videoMode === "affiliate" && modelId?.includes("veed-fabric") && !audioUrl) {
       return res.status(400).json({
-        success: false,
-        error: "Model AI wajib dipilih."
+        error: "Veed Fabric wajib memakai audio voice over."
       });
     }
 
-    function fallbackMotion(displayName) {
-      return {
-        name: displayName,
-        mode: "motion-control-fallback",
-        endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
-        maxDuration: 30
-      };
-    }
+    const selectedModel = getVideoEndpoint({
+      videoMode,
+      modelId,
+      hasVideoReference: Boolean(videoUrl)
+    });
 
-    const MODEL_ROUTES = {
-      // KLING - motion transfer utama
-      "kling-3-1-motion-control": {
-        name: "Kling 3.1 Motion Control",
-        mode: "motion-control",
-        endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
-        maxDuration: 30
-      },
+    const finalPrompt = buildPrompt({
+      videoMode,
+      prompt,
+      productName,
+      productBenefits,
+      ctaText,
+      affiliateStyle
+    });
 
-      "kling-3-motion-control-std": {
-        name: "Kling 3 Motion Control Standard",
-        mode: "motion-control",
-        endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
-        maxDuration: 30
-      },
+    let payload = {};
 
-      "kling-2-6-motion-control": {
-        name: "Kling 2.6 Motion Control",
-        mode: "motion-control",
-        endpoint: "https://api.freepik.com/v1/ai/video/kling-v2-6-motion-control-std",
-        maxDuration: 30
-      },
-
-      "kling-3-1-omni": {
-        name: "Kling 3.1 Omni",
-        mode: "reference-to-video",
-        endpoint: "https://api.freepik.com/v1/ai/reference-to-video/kling-v3-omni-std",
-        maxDuration: 15
-      },
-
-      "kling-3-0": {
-        name: "Kling 3.0",
-        mode: "motion-control-fallback",
-        endpoint: "https://api.freepik.com/v1/ai/video/kling-v3-motion-control-std",
-        maxDuration: 30
-      },
-
-      "kling-2-6": fallbackMotion("Kling 2.6"),
-      "kling-o1": fallbackMotion("Kling O1"),
-      "kling-2-5": fallbackMotion("Kling 2.5"),
-      "kling-2-1": fallbackMotion("Kling 2.1"),
-      "kling-2-1-master": fallbackMotion("Kling 2.1 Master"),
-
-      // SEEDANCE - aktif di UI, fallback ke Kling Motion Control
-      "seedance-2-0": fallbackMotion("Seedance 2.0"),
-      "seedance-2-0-fast": fallbackMotion("Seedance 2.0 Fast"),
-      "seedance-1-5-pro": fallbackMotion("Seedance 1.5 Pro"),
-      "seedance-1-0-pro": fallbackMotion("Seedance 1.0 Pro"),
-      "seedance-1-0-fast": fallbackMotion("Seedance 1.0 Fast"),
-      "seedance-1-0-lite": fallbackMotion("Seedance 1.0 Lite"),
-
-      // GROK
-      "grok": fallbackMotion("Grok"),
-
-      // GOOGLE VEO
-      "veo-3-1": fallbackMotion("Google Veo 3.1"),
-      "veo-3-1-fast": fallbackMotion("Google Veo 3.1 Fast"),
-      "veo-3-1-lite": fallbackMotion("Google Veo 3.1 Lite"),
-      "veo-3": fallbackMotion("Google Veo 3"),
-      "veo-3-fast": fallbackMotion("Google Veo 3 Fast"),
-      "veo-2": fallbackMotion("Google Veo 2"),
-
-      // OMNI HUMAN
-      "omni-human-1-5": fallbackMotion("Omni Human 1.5"),
-
-      // RUNWAY
-      "runway-gen-4-5": fallbackMotion("Runway Gen 4.5"),
-      "runway-gen-4": fallbackMotion("Runway Gen 4"),
-      "runway-act-two": fallbackMotion("Runway Act Two"),
-
-      // VEED FABRIC
-      "veed-fabric-1-0": fallbackMotion("Veed Fabric 1.0"),
-      "veed-fabric-1-0-fast": fallbackMotion("Veed Fabric 1.0 Fast"),
-
-      // HAILUO
-      "hailuo-2-3": fallbackMotion("MiniMax Hailuo 2.3"),
-      "hailuo-2-3-fast": fallbackMotion("MiniMax Hailuo 2.3 Fast"),
-      "hailuo-02": fallbackMotion("MiniMax Hailuo 02"),
-      "hailuo-live-illustrations": fallbackMotion("MiniMax Hailuo Live Illustrations"),
-
-      // PIXVERSE
-      "pixverse-6": fallbackMotion("PixVerse 6"),
-      "pixverse-5-5": fallbackMotion("PixVerse 5.5"),
-
-      // SORA
-      "sora-2-pro": fallbackMotion("Sora 2 Pro"),
-      "sora-2": fallbackMotion("Sora 2"),
-
-      // WAN
-      "wan-2-7": fallbackMotion("Wan 2.7"),
-      "wan-2-6": fallbackMotion("Wan 2.6"),
-      "wan-2-5": fallbackMotion("Wan 2.5"),
-      "wan-2-2": fallbackMotion("Wan 2.2"),
-      "wan-2-2-anime-move": fallbackMotion("Wan 2.2 Anime Move"),
-
-      // LTX
-      "ltx-2-pro": fallbackMotion("LTX 2 Pro"),
-      "ltx-2-fast": fallbackMotion("LTX 2 Fast")
-    };
-
-    const selectedModel = MODEL_ROUTES[modelId];
-
-    if (!selectedModel) {
-      return res.status(400).json({
-        success: false,
-        error: "Model AI tidak dikenali.",
-        receivedModelId: modelId
-      });
-    }
-
-    const MODE_MAX_DURATION = {
-  cloning: 30,
-  timelapse: 90,
-  affiliate: 300
-};
-
-const MODE_DEFAULT_DURATION = {
-  cloning: 5,
-  timelapse: 15,
-  affiliate: 30
-};
-
-const requestedDuration = Number(
-  duration || MODE_DEFAULT_DURATION[selectedVideoMode] || 5
-);
-
-const modeMaxDuration = MODE_MAX_DURATION[selectedVideoMode] || 30;
-
-// Untuk keamanan API, tetap batasi sesuai model jika model punya batas lebih kecil.
-const allowedMaxDuration = Math.min(
-  modeMaxDuration,
-  selectedModel.maxDuration || modeMaxDuration
-);
-
-if (requestedDuration > allowedMaxDuration) {
-  return res.status(400).json({
-    success: false,
-    error: `Durasi maksimal untuk mode ${selectedVideoMode} dengan model ${selectedModel.name} adalah ${allowedMaxDuration} detik.`,
-    requestedDuration,
-    modeMaxDuration,
-    modelMaxDuration: selectedModel.maxDuration
-  });
-}
-
-    const qualityPrompt = `
-Create a realistic high quality AI video.
-The uploaded image is the main character/model.
-The reference video is the motion source.
-Transfer the body movement, dance rhythm, timing, gesture, pose, and expression from the reference video to the uploaded model image.
-Keep the face identity, skin tone, hair, outfit, body proportion, and character consistency from the uploaded image.
-Use realistic lighting, smooth motion, stable camera, natural body movement, full body framing, cinematic quality, clean details.
-Avoid distorted face, extra limbs, duplicate body, broken hands, bad anatomy, flicker, blur, watermark, text, logo, body glitch, and unnatural movement.
-
-Selected model label:
-${selectedModel.name}
-
-User optional prompt:
-${prompt || "Realistic full body dance video, smooth motion, stable camera, natural lighting, social-media ready."}
-`;
-
-    let requestBody = {};
-
-    if (
-      selectedModel.mode === "motion-control" ||
-      selectedModel.mode === "motion-control-fallback"
-    ) {
-      requestBody = {
-        image_url: imageUrl,
-        video_url: videoUrl,
-        prompt: qualityPrompt,
-        character_orientation: "video",
-        cfg_scale: 0.5
-      };
-    }
-
-    if (selectedModel.mode === "reference-to-video") {
-      requestBody = {
+    if (selectedModel.type === "motion-control") {
+      payload = {
         video_url: videoUrl,
         image_url: imageUrl,
-        prompt: `
-Use @Video1 as the main motion reference.
-Create a new realistic video where the uploaded model image follows the movement from @Video1.
-${qualityPrompt}
-`,
-        duration: String(Math.min(requestedDuration, selectedModel.maxDuration)),
-        aspect_ratio: aspectRatio || "9:16",
+        prompt: finalPrompt,
+        duration: String(cleanDuration(duration, 5)),
+        aspect_ratio: normalizeAspectRatio(aspectRatio),
         cfg_scale: 0.5,
         negative_prompt:
-          "blur, low quality, distorted face, deformed body, extra limbs, duplicate person, broken hands, bad anatomy, flicker, watermark, text, logo, unnatural movement, body glitch"
+          "extra phone, extra hands, duplicate object, distorted fingers, blur, low quality, watermark, text artifacts, face distortion"
       };
     }
 
-    const freepikResponse = await fetch(selectedModel.endpoint, {
+    if (selectedModel.type === "reference-to-video") {
+      payload = {
+        video_url: videoUrl,
+        image_url: imageUrl,
+        prompt: `${finalPrompt} Use @Video1 as the motion and style reference.`,
+        duration: String(cleanDuration(duration, 5)),
+        aspect_ratio: normalizeAspectRatio(aspectRatio),
+        cfg_scale: 0.5,
+        negative_prompt:
+          "extra objects, duplicate phone, distorted hands, blur, low quality, watermark"
+      };
+    }
+
+    if (selectedModel.type === "image-to-video") {
+      payload = {
+        image_url: imageUrl || productImageUrl,
+        prompt: finalPrompt,
+        duration: String(cleanDuration(duration, 5)),
+        aspect_ratio: normalizeAspectRatio(aspectRatio),
+        cfg_scale: 0.5,
+        negative_prompt:
+          "blur, low quality, watermark, text artifacts, distorted face, extra hands, duplicate objects"
+      };
+    }
+
+    if (selectedModel.type === "text-to-video") {
+      payload = {
+        prompt: finalPrompt,
+        duration: String(cleanDuration(duration, 5)),
+        aspect_ratio: normalizeAspectRatio(aspectRatio),
+        cfg_scale: 0.5,
+        negative_prompt:
+          "blur, low quality, watermark, text artifacts, distorted face, extra hands, duplicate objects"
+      };
+    }
+
+    if (selectedModel.type === "lip-sync") {
+      payload = {
+        image_url: imageUrl,
+        audio_url: audioUrl,
+        resolution: resolution || "720p"
+      };
+    }
+
+    const response = await fetch(`${FREEPIK_BASE_URL}${selectedModel.createEndpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-freepik-api-key": freepikApiKey
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(payload)
     });
 
-    const data = await freepikResponse.json();
+    const data = await response.json().catch(() => ({}));
 
-    if (!freepikResponse.ok) {
-      return res.status(freepikResponse.status).json({
-        success: false,
-        error: "Request ke Freepik gagal.",
-        selectedModel: selectedModel.name,
-        mode: selectedModel.mode,
-        endpoint: selectedModel.endpoint,
-        detail: data
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error:
+          data?.message ||
+          data?.error ||
+          data?.detail ||
+          "Freepik generate gagal.",
+        endpoint: selectedModel.createEndpoint,
+        modelId,
+        videoMode,
+        raw: data,
+        sentPayload: payload
       });
     }
 
+    const taskId = getTaskId(data);
+    const directVideoUrl = getDirectVideoUrl(data);
+
     return res.status(200).json({
-      success: true,
-      message: "Request video berhasil dikirim ke Freepik.",
-      selectedModel: selectedModel.name,
-      mode: selectedModel.mode,
-      note:
-        selectedModel.mode === "motion-control-fallback"
-          ? "Model ini aktif di UI, tetapi backend menjalankan motion transfer melalui Kling Motion Control agar fitur video referensi tetap bekerja."
-          : "Model dijalankan sesuai route backend.",
-      result: data
+      ok: true,
+      task_id: taskId,
+      videoUrl: directVideoUrl,
+      endpoint: selectedModel.createEndpoint,
+      statusEndpoint: selectedModel.statusEndpoint,
+      modelType: selectedModel.type,
+      modelId,
+      videoMode,
+      raw: data
     });
   } catch (error) {
     return res.status(500).json({
-      success: false,
-      error: "Terjadi error di backend.",
-      detail: error.message
+      error: error?.message || "Terjadi error di backend generate."
     });
   }
-    }
+                                      }
