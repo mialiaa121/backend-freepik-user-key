@@ -6,5 +6,7 @@
   "scripts": {
     "start": "node api/generate.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@supabase/supabase-js": "latest"
+  }
 }
