@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -32,6 +32,16 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  if (req.method === "GET") {
+    return res.status(200).json({
+      ok: true,
+      message: "Webhook aktif. Gunakan POST dari Lynk.id.",
+      hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
+      hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      supabaseUrl: process.env.SUPABASE_URL || null
+    });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({
       error: "Method not allowed"
@@ -42,13 +52,19 @@ export default async function handler(req, res) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl) {
       return res.status(500).json({
-        error: "SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY belum diisi di Vercel."
+        error: "SUPABASE_URL belum diisi di Vercel Environment Variables."
       });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    if (!serviceRoleKey) {
+      return res.status(500).json({
+        error:
+          "SUPABASE_SERVICE_ROLE_KEY belum diisi di Vercel Environment Variables."
+      });
+    }
+
     const body = req.body || {};
 
     const email = normalizeEmail(
@@ -57,7 +73,8 @@ export default async function handler(req, res) {
         "customer_email",
         "buyer_email",
         "payer_email",
-        "user_email"
+        "user_email",
+        "contact_email"
       ])
     );
 
@@ -94,54 +111,43 @@ export default async function handler(req, res) {
         "status",
         "payment_status",
         "transaction_status",
-        "order_status"
+        "order_status",
+        "event",
+        "event_name"
       ]) || "paid";
-
-    const statusText = String(statusRaw).toLowerCase();
-
-    const isPaid =
-      statusText.includes("paid") ||
-      statusText.includes("success") ||
-      statusText.includes("complete") ||
-      statusText.includes("completed") ||
-      statusText.includes("settlement") ||
-      statusText === "1" ||
-      statusText === "true";
 
     if (!email) {
       return res.status(400).json({
         error: "Email pembeli tidak ditemukan dari payload Lynk.id.",
+        receivedKeys: Object.keys(body || {}),
         received: body
       });
     }
 
-    if (!isPaid) {
-      return res.status(200).json({
-        ok: true,
-        saved: false,
-        message: "Webhook diterima, tapi status belum paid/success.",
-        email,
-        status: statusRaw
-      });
-    }
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const { error } = await supabaseAdmin.from("buyers").upsert(
-      {
-        email,
-        name,
-        phone,
-        product_name: productName,
-        status: "paid",
-        raw_data: body
-      },
-      {
-        onConflict: "email"
-      }
-    );
+    const { data, error } = await supabaseAdmin
+      .from("buyers")
+      .upsert(
+        {
+          email,
+          name,
+          phone,
+          product_name: productName,
+          status: "paid",
+          raw_data: body
+        },
+        {
+          onConflict: "email"
+        }
+      )
+      .select();
 
     if (error) {
       return res.status(500).json({
-        error: error.message
+        error: "Supabase insert/upsert gagal.",
+        supabaseError: error.message,
+        details: error
       });
     }
 
@@ -150,11 +156,14 @@ export default async function handler(req, res) {
       saved: true,
       email,
       name,
-      product_name: productName
+      product_name: productName,
+      status: statusRaw,
+      data
     });
   } catch (error) {
     return res.status(500).json({
-      error: error?.message || "Webhook error"
+      error: "Webhook error.",
+      message: error?.message || String(error)
     });
   }
-        }
+}
