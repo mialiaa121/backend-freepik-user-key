@@ -1,3 +1,5 @@
+Ini full kode backend api/generate.js. Replace semua isi file backend generate kamu dengan ini.
+
 const FREEPIK_BASE_URL = "https://api.freepik.com";
 
 function setCors(res) {
@@ -34,7 +36,10 @@ function getVideoEndpoint({ videoMode, modelId, hasVideoReference }) {
     };
   }
 
-  if (modelId === "kling-3-1-motion-control" || modelId === "kling-3-0-motion-control") {
+  if (
+    modelId === "kling-3-1-motion-control" ||
+    modelId === "kling-3-0-motion-control"
+  ) {
     return {
       type: "motion-control",
       createEndpoint: "/v1/ai/video/kling-v3-motion-control-pro",
@@ -152,7 +157,7 @@ function buildPrompt({
   if (prompt && prompt.trim()) return prompt.trim();
 
   if (videoMode === "cloning") {
-    return "Transfer the motion from the reference video to the character image. Preserve the person's face, identity, outfit, body proportions, and realistic movement. Avoid extra phones, extra hands, duplicated objects, distorted fingers, blur, or changing the original character.";
+    return `Transfer the motion from the reference video to the character image. Preserve the person's face, identity, outfit, body proportions, and realistic movement. Add realistic HD lighting, natural shadow, sharper detail, and clear realistic video quality. Avoid extra hands, distorted fingers, blur, warping, or changing the original character.`;
   }
 
   if (videoMode === "timelapse") {
@@ -160,7 +165,9 @@ function buildPrompt({
   }
 
   if (videoMode === "affiliate") {
-    return `Create a realistic affiliate UGC video in the style: ${affiliateStyle || "UGC Review Natural"}.
+    return `Create a realistic affiliate UGC video in the style: ${
+      affiliateStyle || "UGC Review Natural"
+    }.
 Product: ${productName || "the product"}.
 Main benefits: ${productBenefits || "show the product benefits naturally"}.
 CTA: ${ctaText || "try it now"}.
@@ -246,7 +253,11 @@ export default async function handler(req, res) {
       });
     }
 
-    if (videoMode === "affiliate" && modelId?.includes("veed-fabric") && !audioUrl) {
+    if (
+      videoMode === "affiliate" &&
+      modelId?.includes("veed-fabric") &&
+      !audioUrl
+    ) {
       return res.status(400).json({
         error: "Veed Fabric wajib memakai audio voice over."
       });
@@ -270,28 +281,19 @@ export default async function handler(req, res) {
     let payload = {};
 
     if (selectedModel.type === "motion-control") {
-  coif (selectedModel.type === "motion-control") {
-  const safePrompt = `
-Transfer the dance motion from the reference video to the person in the image. Keep the face, identity, body shape, posture, body proportions, hairstyle, skin tone, and outfit exactly the same. Do not change the face or body.
+      const safePrompt =
+        finalPrompt ||
+        "Transfer the dance motion from the reference video to the person in the image. Keep the face, identity, body shape, posture, body proportions, hairstyle, skin tone, and outfit exactly the same. Make the dance motion realistic, natural, smooth, and stable. Add realistic HD lighting, sharper detail, natural shadow, contact shadow under the feet, realistic skin texture, and clearer video quality.";
 
-Make the dance motion realistic, natural, smooth, and stable, following the timing of the reference video. The result must look like a real camera video, not AI-generated.
-
-Add realistic HD lighting, sharper detail, natural shadow, contact shadow under the feet, realistic skin texture, and clearer video quality.
-
-Hands must look natural and human. Keep realistic fingers, palms, wrists, knuckles, and matching skin tone between hands, arms, face, and body.
-
-Avoid changed face, changed identity, changed body shape, slimmer body, bigger body, face morphing, distorted hands, weird legs, stiff motion, flicker, blur, warping, AI look.
-`;
-
-  payload = {
-    video_url: videoUrl,
-    image_url: imageUrl,
-    prompt: prompt && prompt.trim() ? prompt.trim() : safePrompt.trim(),
-    duration: String(cleanDuration(duration, 5)),
-    aspect_ratio: normalizeAspectRatio(aspectRatio),
-    cfg_scale: 0.35
-  };
-}
+      payload = {
+        video_url: videoUrl,
+        image_url: imageUrl,
+        prompt: safePrompt,
+        duration: String(cleanDuration(duration, 5)),
+        aspect_ratio: normalizeAspectRatio(aspectRatio),
+        cfg_scale: 0.35
+      };
+    }
 
     if (selectedModel.type === "reference-to-video") {
       payload = {
@@ -300,9 +302,7 @@ Avoid changed face, changed identity, changed body shape, slimmer body, bigger b
         prompt: `${finalPrompt} Use @Video1 as the motion and style reference.`,
         duration: String(cleanDuration(duration, 5)),
         aspect_ratio: normalizeAspectRatio(aspectRatio),
-        cfg_scale: 0.5,
-        negative_prompt:
-          "extra objects, duplicate phone, distorted hands, blur, low quality, watermark"
+        cfg_scale: 0.5
       };
     }
 
@@ -312,9 +312,7 @@ Avoid changed face, changed identity, changed body shape, slimmer body, bigger b
         prompt: finalPrompt,
         duration: String(cleanDuration(duration, 5)),
         aspect_ratio: normalizeAspectRatio(aspectRatio),
-        cfg_scale: 0.5,
-        negative_prompt:
-          "blur, low quality, watermark, text artifacts, distorted face, extra hands, duplicate objects"
+        cfg_scale: 0.5
       };
     }
 
@@ -323,9 +321,7 @@ Avoid changed face, changed identity, changed body shape, slimmer body, bigger b
         prompt: finalPrompt,
         duration: String(cleanDuration(duration, 5)),
         aspect_ratio: normalizeAspectRatio(aspectRatio),
-        cfg_scale: 0.5,
-        negative_prompt:
-          "blur, low quality, watermark, text artifacts, distorted face, extra hands, duplicate objects"
+        cfg_scale: 0.5
       };
     }
 
@@ -337,14 +333,17 @@ Avoid changed face, changed identity, changed body shape, slimmer body, bigger b
       };
     }
 
-    const response = await fetch(`${FREEPIK_BASE_URL}${selectedModel.createEndpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-freepik-api-key": freepikApiKey
-      },
-      body: JSON.stringify(payload)
-    });
+    const response = await fetch(
+      `${FREEPIK_BASE_URL}${selectedModel.createEndpoint}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-freepik-api-key": freepikApiKey
+        },
+        body: JSON.stringify(payload)
+      }
+    );
 
     const data = await response.json().catch(() => ({}));
 
@@ -382,4 +381,4 @@ Avoid changed face, changed identity, changed body shape, slimmer body, bigger b
       error: error?.message || "Terjadi error di backend generate."
     });
   }
-                                      }
+}
