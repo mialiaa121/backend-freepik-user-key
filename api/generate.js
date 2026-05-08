@@ -270,61 +270,26 @@ export default async function handler(req, res) {
     let payload = {};
 
     if (selectedModel.type === "motion-control") {
-  const identityPrompt = `
-Transfer the dance motion from the reference video to the person in the image.
+  coif (selectedModel.type === "motion-control") {
+  const safePrompt = `
+Transfer the dance motion from the reference video to the person in the image. Keep the face, identity, body shape, posture, body proportions, hairstyle, skin tone, and outfit exactly the same. Do not change the face or body.
 
-CRITICAL IDENTITY LOCK:
-- Preserve the exact same face from the input image.
-- Do not change facial identity.
-- Do not change face shape, eyes, nose, lips, smile, dimples, skin tone, hairstyle, outfit, or body proportions.
-- Keep the same person from start to end.
-- Maintain stable facial structure in every frame.
-- The final video must still look like the exact same person from the uploaded photo.
+Make the dance motion realistic, natural, smooth, and stable, following the timing of the reference video. The result must look like a real camera video, not AI-generated.
 
-BEAUTY GLASS SKIN LOOK:
-- Make the face look fresh, clean, luminous, and glowing.
-- Add natural Korean glass skin effect.
-- Skin should look dewy, hydrated, glossy, and slightly reflective.
-- Add soft natural highlights on forehead, cheeks, nose bridge, and chin.
-- Make the face look bright, healthy, smooth, and premium.
-- Keep realistic skin texture and natural pores.
-- Keep the skin glow elegant and realistic.
-- Do not make the skin oily, sweaty, plastic, waxy, or over-smoothed.
+Add realistic HD lighting, sharper detail, natural shadow, contact shadow under the feet, realistic skin texture, and clearer video quality.
 
-QUALITY:
-- Ultra clear high resolution look.
-- Sharp facial details.
-- Premium beauty commercial quality.
-- Realistic camera quality.
-- Bright natural lighting.
-- Clean smooth video.
-- Stable face detail.
-- Smooth realistic body movement.
-- No blur on the face.
-- No low resolution look.
+Hands must look natural and human. Keep realistic fingers, palms, wrists, knuckles, and matching skin tone between hands, arms, face, and body.
 
-MOTION:
-- Follow the dance motion from the reference video.
-- Keep motion natural, stable, and realistic.
-- Avoid excessive face deformation during movement.
-- Keep the head, body, arms, and hands realistic.
-
-NEGATIVE:
-No different person, no identity drift, no face morphing, no face distortion, no blurry face, no low quality, no deformed eyes, no changed nose, no changed lips, no warped mouth, no oily face, no sweaty face, no plastic skin, no waxy skin, no over-smoothed skin, no extra hands, no extra fingers, no duplicate limbs, no broken body, no extra phone, no watermark, no text artifacts.
+Avoid changed face, changed identity, changed body shape, slimmer body, bigger body, face morphing, distorted hands, weird legs, stiff motion, flicker, blur, warping, AI look.
 `;
 
   payload = {
     video_url: videoUrl,
     image_url: imageUrl,
-    prompt:
-      prompt && prompt.trim()
-        ? `${identityPrompt}\n\nExtra user instruction:\n${prompt}`
-        : identityPrompt,
+    prompt: prompt && prompt.trim() ? prompt.trim() : safePrompt.trim(),
     duration: String(cleanDuration(duration, 5)),
     aspect_ratio: normalizeAspectRatio(aspectRatio),
-    cfg_scale: 0.35,
-    negative_prompt:
-      "different person, identity drift, face morphing, face distortion, changed face, changed eyes, changed nose, changed lips, blurry face, low quality, deformed face, warped mouth, oily face, sweaty face, plastic skin, waxy skin, over-smoothed skin, extra hands, extra fingers, duplicate limbs, broken body, extra phone, watermark, text artifacts"
+    cfg_scale: 0.35
   };
 }
 
